@@ -1,7 +1,7 @@
 {
   "name": "gatsby-plugin-advanced-sitemap",
   "description": "Gatsby plugin that automatically creates a sitemap for your site",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "MIT",
   "author": "Ghost Foundation",
   "homepage": "https://docs.ghost.org/api/gatsby/",
