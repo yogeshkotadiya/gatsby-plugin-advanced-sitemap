@@ -3,98 +3,98 @@ jest.mock(`fs-extra`);
 const fs = require(`fs-extra`);
 const path = require(`path`);
 
-const { onPostBuild } = require(`../gatsby-node`);
+const {onPostBuild} = require(`../gatsby-node`);
+const utils = require('../utils');
 
-import * as utils from "../utils";
 const pathPrefix = ``;
 
 beforeEach(() => {
-  global.__PATH_PREFIX__ = ``;
+    global.__PATH_PREFIX__ = ``;
 });
 
 describe(`Test plugin sitemap`, () => {
-  it(`default settings work properly`, async () => {
-    utils.writeFile = jest.fn();
-    utils.writeFile.mockResolvedValue(true);
+    it(`default settings work properly`, async () => {
+        utils.writeFile = jest.fn();
+        utils.writeFile.mockResolvedValue(true);
 
-    utils.readFile = jest.fn();
-    utils.readFile.mockResolvedValue(true);
+        utils.readFile = jest.fn();
+        utils.readFile.mockResolvedValue(true);
 
-    const graphql = jest.fn();
+        const graphql = jest.fn();
 
-    graphql.mockResolvedValue({
-      data: {
-        site: {
-          siteMetadata: {
-            siteUrl: `http://dummy.url`,
-          },
-        },
-        allSitePage: {
-          edges: [
-            {
-              node: {
-                id: 1,
-                slug: `page-1`,
-                url: `http://dummy.url/page-1`,
-              },
-            },
-            {
-              node: {
-                id: 2,
-                slug: `page-2`,
-                url: `http://dummy.url/page-2`,
-              },
-            },
-          ],
-        },
-      },
+        graphql.mockResolvedValue({
+            data: {
+                site: {
+                    siteMetadata: {
+                        siteUrl: `http://dummy.url`
+                    }
+                },
+                allSitePage: {
+                    edges: [
+                        {
+                            node: {
+                                id: 1,
+                                slug: `page-1`,
+                                url: `http://dummy.url/page-1`
+                            }
+                        },
+                        {
+                            node: {
+                                id: 2,
+                                slug: `page-2`,
+                                url: `http://dummy.url/page-2`
+                            }
+                        }
+                    ]
+                }
+            }
+        });
+
+        await onPostBuild({graphql, pathPrefix}, {});
+
+        const [filePath] = utils.writeFile.mock.calls[1];
+
+        expect(filePath).toEqual(path.join(`public`, `sitemap.xml`));
     });
 
-    await onPostBuild({ graphql, pathPrefix }, {});
+    it(`custom query runs`, async () => {
+        utils.writeFile = jest.fn();
+        utils.writeFile.mockResolvedValue(true);
 
-    const [filePath, contents] = utils.writeFile.mock.calls[1];
+        utils.readFile = jest.fn();
+        utils.readFile.mockResolvedValue(true);
 
-    expect(filePath).toEqual(path.join(`public`, `sitemap.xml`));
-  });
+        const graphql = jest.fn();
 
-  it(`custom query runs`, async () => {
-    utils.writeFile = jest.fn();
-    utils.writeFile.mockResolvedValue(true);
+        graphql.mockResolvedValue({
+            data: {
+                site: {
+                    siteMetadata: {
+                        siteUrl: `http://dummy.url`
+                    }
+                },
+                allSitePage: {
+                    edges: [
+                        {
+                            node: {
+                                id: 1,
+                                slug: `page-1`,
+                                url: `http://dummy.url/page-1`
+                            }
+                        },
+                        {
+                            node: {
+                                id: 2,
+                                slug: `/exclude-page`,
+                                url: `http://dummy.url/post/exclude-page`
+                            }
+                        }
+                    ]
+                }
+            }
+        });
 
-    utils.readFile = jest.fn();
-    utils.readFile.mockResolvedValue(true);
-
-    const graphql = jest.fn();
-
-    graphql.mockResolvedValue({
-      data: {
-        site: {
-          siteMetadata: {
-            siteUrl: `http://dummy.url`,
-          },
-        },
-        allSitePage: {
-          edges: [
-            {
-              node: {
-                id: 1,
-                slug: `page-1`,
-                url: `http://dummy.url/page-1`,
-              },
-            },
-            {
-              node: {
-                id: 2,
-                slug: `/exclude-page`,
-                url: `http://dummy.url/post/exclude-page`,
-              },
-            },
-          ],
-        },
-      },
-    });
-
-    const customQuery = `
+        const customQuery = `
       {
         site {
           siteMetadata {
@@ -111,87 +111,85 @@ describe(`Test plugin sitemap`, () => {
         } 
     }`;
 
-    const options = {
-      output: `custom-sitemap.xml`,
-      serialize: (edges) =>
-        edges.map((edge) => {
-          edge.node.slug = `/post` + edge.node.slug;
+        const options = {
+            output: `custom-sitemap.xml`,
+            serialize: edges => edges.map((edge) => {
+                edge.node.slug = `/post` + edge.node.slug;
 
-          return edge;
-        }),
-      exclude: [`/post/exclude-page`],
-      query: customQuery,
-    };
+                return edge;
+            }),
+            exclude: [`/post/exclude-page`],
+            query: customQuery
+        };
 
-    await onPostBuild({ graphql, pathPrefix }, options);
+        await onPostBuild({graphql, pathPrefix}, options);
 
-    const [filePath, contents] = utils.writeFile.mock.calls[1];
+        const [filePath] = utils.writeFile.mock.calls[1];
 
-    expect(filePath).toEqual(path.join(`public`, `custom-sitemap.xml`));
-    expect(graphql).toBeCalledWith(customQuery);
-  });
+        expect(filePath).toEqual(path.join(`public`, `custom-sitemap.xml`));
+        expect(graphql).toBeCalledWith(customQuery);
+    });
 });
 
 describe(`sitemap index`, () => {
-  let graphql = null;
-  const queryResult = {
-    data: {
-      site: {
-        siteMetadata: {
-          siteUrl: `http://dummy.url`,
-        },
-      },
-      allSitePage: {
-        edges: [
-          {
-            node: {
-              id: 1,
-              slug: `page-1`,
-              url: `http://dummy.url/page-1`,
+    let graphql = null;
+    const queryResult = {
+        data: {
+            site: {
+                siteMetadata: {
+                    siteUrl: `http://dummy.url`
+                }
             },
-          },
-          {
-            node: {
-              id: 2,
-              slug: `/exclude-page`,
-              url: `http://dummy.url/post/exclude-page`,
-            },
-          },
-        ],
-      },
-    },
-  };
-  beforeEach(() => {
-    graphql = jest.fn();
-    graphql.mockResolvedValue(queryResult);
+            allSitePage: {
+                edges: [
+                    {
+                        node: {
+                            id: 1,
+                            slug: `page-1`,
+                            url: `http://dummy.url/page-1`
+                        }
+                    },
+                    {
+                        node: {
+                            id: 2,
+                            slug: `/exclude-page`,
+                            url: `http://dummy.url/post/exclude-page`
+                        }
+                    }
+                ]
+            }
+        }
+    };
+    beforeEach(() => {
+        graphql = jest.fn();
+        graphql.mockResolvedValue(queryResult);
 
-    fs.createWriteStream.mockReset();
-    fs.createWriteStream.mockReturnValue({
-      once: jest.fn((event, cb) => cb()),
-      write: jest.fn(),
-      end: jest.fn(),
+        fs.createWriteStream.mockReset();
+        fs.createWriteStream.mockReturnValue({
+            once: jest.fn((event, cb) => cb()),
+            write: jest.fn(),
+            end: jest.fn()
+        });
+
+        fs.statSync.mockReset();
+        fs.statSync.mockReturnValue({
+            isDirectory: jest.fn(() => true)
+        });
     });
 
-    fs.statSync.mockReset();
-    fs.statSync.mockReturnValue({
-      isDirectory: jest.fn(() => true),
+    it(`set Prefix to sitemaps`, async () => {
+        const options = {
+            prefix: `posts/`
+        };
+        utils.renameFile = jest.fn();
+        utils.renameFile.mockResolvedValue(true);
+
+        utils.writeFile = jest.fn();
+        utils.writeFile.mockResolvedValue(true);
+
+        await onPostBuild({graphql, pathPrefix}, options);
+        const [sitemap] = utils.writeFile.mock.calls[1];
+
+        expect(sitemap).toEqual(path.join(`public`, `sitemap.xml`));
     });
-  });
-
-  it(`set Prefix to sitemaps`, async () => {
-    const options = {
-      prefix: `posts/`
-    }
-    utils.renameFile = jest.fn();
-    utils.renameFile.mockResolvedValue(true);
-
-    utils.writeFile = jest.fn();
-    utils.writeFile.mockResolvedValue(true);
-
-    await onPostBuild({ graphql, pathPrefix }, options);
-    const [sitemap, contents] = utils.writeFile.mock.calls[1];
-
-
-    expect(sitemap).toEqual(path.join(`public`, `sitemap.xml`));
-  });
 });

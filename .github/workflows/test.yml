@@ -19,3 +19,4 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: yarn
       - run: yarn lint
+      - run: yarn test

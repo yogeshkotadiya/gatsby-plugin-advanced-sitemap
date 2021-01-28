@@ -1,12 +1,12 @@
-import _ from 'lodash'
-import BaseSiteMapGenerator from './BaseSiteMapGenerator'
+import _ from 'lodash';
+import BaseSiteMapGenerator from './BaseSiteMapGenerator';
 
 export default class SiteMapGenerator extends BaseSiteMapGenerator {
     constructor(opts, type) {
-        super()
+        super();
 
-        this.name = type || `pages`
+        this.name = type || `pages`;
 
-        _.extend(this, opts)
+        _.extend(this, opts);
     }
 }
