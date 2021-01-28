@@ -3,7 +3,7 @@ import xml from 'xml'
 import moment from 'moment'
 import path from 'path'
 
-import localUtils from './utils'
+import * as utils from './utils'
 
 // Sitemap specific xml namespace declarations that should not change
 const XMLNS_DECLS = {
@@ -42,7 +42,7 @@ export default class BaseSiteMapGenerator {
         }
 
         // Return the xml
-        return localUtils.getDeclarations(options) + xml(data)
+        return utils.sitemapsUtils.getDeclarations(options) + xml(data)
     }
 
     addUrl(url, datum) {

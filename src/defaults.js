@@ -18,6 +18,7 @@ const defaultOptions = {
             sitemap: `pages`,
         },
     },
+    output: `/sitemap.xml`,
     exclude: [
         `/dev-404-page`,
         `/404`,

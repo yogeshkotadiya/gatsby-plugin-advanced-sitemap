@@ -4,7 +4,7 @@ import moment from 'moment'
 import url from 'url'
 import path from 'path'
 
-import localUtils from './utils'
+import * as utils from './utils'
 
 const XMLNS_DECLS = {
     _attr: {
@@ -26,7 +26,7 @@ export default class SiteMapIndexGenerator {
         }
 
         // Return the xml
-        return localUtils.getDeclarations(options) + xml(data)
+        return utils.sitemapsUtils.getDeclarations(options) + xml(data)
     }
 
     generateSiteMapUrlElements({ sources, siteUrl, pathPrefix, resourcesOutput }) {

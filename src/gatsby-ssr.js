@@ -3,10 +3,14 @@ import { withPrefix } from 'gatsby'
 import defaultOptions from './defaults'
 
 exports.onRenderBody = ({ setHeadComponents }, pluginOptions) => {
-    let { createLinkInHead } = { ...defaultOptions, ...pluginOptions }
+    let { output, createLinkInHead } = { ...defaultOptions, ...pluginOptions }
 
     if (!createLinkInHead) {
         return
+    }
+
+    if (output.charAt(0) !== `/`) {
+        output = `/` + output
     }
 
     setHeadComponents([
@@ -14,7 +18,7 @@ exports.onRenderBody = ({ setHeadComponents }, pluginOptions) => {
             key={`gatsby-plugin-advanced-sitemap`}
             rel="sitemap"
             type="application/xml"
-            href={withPrefix(`/sitemap.xml`)}
+            href={withPrefix(output)}
         />,
     ])
 }

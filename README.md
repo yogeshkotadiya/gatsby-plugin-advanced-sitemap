@@ -90,12 +90,23 @@ plugins: [
                     }
                 }
             }`,
+            // The filepath and name to Index Sitemap. Defaults to '/sitemap.xml'.
+            output: "/custom-sitemap.xml",
             mapping: {
                 // Each data type can be mapped to a predefined sitemap
                 // Routes can be grouped in one of: posts, tags, authors, pages, or a custom name
                 // The default sitemap - if none is passed - will be pages
                 allGhostPost: {
                     sitemap: `posts`,
+                    // Add a query level prefix to slugs, Don't get confused with global path prefix from Gatsby
+                    // This will add a prefix to this perticular sitemap only
+                    prefix: 'your-prefix/',
+                    // Custom Serializer 
+                    serializer: (edges) => {
+                        return edges.map(({ node }) => {
+                            (...) // Custom logic to change final sitemap.
+                        })
+                    }
                 },
                 allGhostTag: {
                     sitemap: `tags`,
@@ -132,6 +143,28 @@ plugins: [
 ```
 
 Example output of ☝️ this exact config 👉 https://gatsby.ghost.org/sitemap.xml
+
+## Develop Plugin
+
+- Pull the repo
+
+1. Install dependencies
+
+```bash
+yarn install
+```
+
+Build Plugin
+
+```bash
+yarn build
+```
+
+Run Tests
+
+```bash
+yarn test
+```
 
 &nbsp;
 

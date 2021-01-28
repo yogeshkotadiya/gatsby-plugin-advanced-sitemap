@@ -1,13 +1,13 @@
 import path from 'path'
 import url from 'url'
-import fs from 'fs-extra'
 import _ from 'lodash'
 
 import defaultOptions from './defaults'
 import Manager from './SiteMapManager'
 
+import * as utils from './utils'
+
 const PUBLICPATH = `./public`
-const INDEXFILE = `/sitemap.xml`
 const RESOURCESFILE = `/sitemap-:resource.xml`
 const XSLFILE = path.resolve(__dirname, `./static/sitemap.xsl`)
 const DEFAULTQUERY = `{
@@ -37,19 +37,24 @@ const copyStylesheet = async ({ siteUrl, pathPrefix, indexOutput }) => {
     const siteRegex = /(\{\{blog-url\}\})/g
 
     // Get our stylesheet template
-    const data = await fs.readFile(XSLFILE)
+    const data = await utils.readFile(XSLFILE)
 
     // Replace the `{{blog-url}}` variable with our real site URL
     const sitemapStylesheet = data.toString().replace(siteRegex, url.resolve(siteUrl, path.join(pathPrefix, indexOutput)))
 
     // Save the updated stylesheet to the public folder, so it will be
     // available for the xml sitemap files
-    await fs.writeFile(path.join(PUBLICPATH, `sitemap.xsl`), sitemapStylesheet)
+    await utils.writeFile(path.join(PUBLICPATH, `sitemap.xsl`), sitemapStylesheet)
 }
 
 const serializeMarkdownNodes = (node) => {
-    if (!node.fields.slug) {
+    if (!node.slug && !node.fields.slug) {
         throw Error(`\`slug\` is a required field`)
+    }
+
+    if (!node.slug) {
+        node.slug = node.fields.slug
+        delete node.fields.slug
     }
 
     node.slug = node.fields.slug
@@ -79,7 +84,7 @@ const getNodePath = (node, allSitePage) => {
     const slugRegex = new RegExp(`${node.path.replace(/\/$/, ``)}$`, `gi`)
 
     for (let page of allSitePage.edges) {
-        if (page.node && page.node.url && page.node.url.replace(/\/$/, ``).match(slugRegex)) {
+        if (page?.node?.url && page.node.url.replace(/\/$/, ``).match(slugRegex)) {
             node.path = page.node.url
             break
         }
@@ -133,18 +138,18 @@ const serializeSources = ({ mapping, additionalSitemaps = [] }) => {
         // source as we need those to create the index
         // and the belonging sources accordingly
         return {
-            name: source.name ? source.name : source.sitemap,
+            name: source.name || source.sitemap,
             sitemap: source.sitemap || `pages`,
         }
     })
 
-    if (additionalSitemaps) {
+    if (Array.isArray(additionalSitemaps)) {
         additionalSitemaps.forEach((addSitemap, index) => {
             if (!addSitemap.url) {
                 throw new Error(`URL is required for additional Sitemap: `, addSitemap)
             }
             sitemaps.push({
-                name: `external-${addSitemap.name ? addSitemap.name : addSitemap.sitemap || `pages-${index}`}`,
+                name: `external-${addSitemap.name || addSitemap.sitemap || `pages-${index}`}`,
                 url: addSitemap.url,
             })
         })
@@ -155,17 +160,30 @@ const serializeSources = ({ mapping, additionalSitemaps = [] }) => {
     return sitemaps
 }
 
-const runQuery = (handler, { query, exclude }) => handler(query).then((r) => {
+const runQuery = (handler, { query, mapping, exclude }) => handler(query).then((r) => {
     if (r.errors) {
         throw new Error(r.errors.join(`, `))
     }
 
     for (let source in r.data) {
+        // Check for custom serializer
+        if (typeof mapping?.[source]?.serializer === `function`) {
+            if (r.data[source] && Array.isArray(r.data[source].edges)) { 
+                const serializedEdges = mapping[source].serializer(r.data[source].edges)
+
+                if (!Array.isArray(serializedEdges)) {
+                    throw new Error(`Custom sitemap serializer must return an array`)
+                }
+                r.data[source].edges = serializedEdges
+            }
+        }
+
         // Removing excluded paths
-        if (r.data[source] && r.data[source].edges && r.data[source].edges.length) {
-            r.data[source].edges = r.data[source].edges.filter(({ node }) => !exclude.some((excludedRoute) => {
+        if (r.data?.[source]?.edges && r.data[source].edges.length) {
+            r.data[source].edges = r.data[source].edges.filter(({ node }) => !exclude.some((excludedRoute) => { 
                 const sourceType = node.__typename ? `all${node.__typename}` : source
-                const slug = (sourceType === `allMarkdownRemark` || sourceType === `allMdx`) ? node.fields.slug.replace(/^\/|\/$/, ``) : node.slug.replace(/^\/|\/$/, ``)
+                const slug = (sourceType === `allMarkdownRemark` || sourceType === `allMdx`) || (node?.fields?.slug) ? node.fields.slug.replace(/^\/|\/$/, ``) : node.slug.replace(/^\/|\/$/, ``)
+                
                 excludedRoute = typeof excludedRoute === `object` ? excludedRoute : excludedRoute.replace(/^\/|\/$/, ``)
 
                 // test if the passed regular expression is valid
@@ -199,7 +217,7 @@ const serialize = ({ ...sources } = {}, { site, allSitePage }, { mapping, addUnc
     siteUrl = site.siteMetadata.siteUrl
 
     for (let type in sources) {
-        if (mapping[type] && mapping[type].sitemap) {
+        if (mapping?.[type]?.sitemap) {
             const currentSource = sources[type] ? sources[type] : []
 
             if (currentSource) {
@@ -220,6 +238,10 @@ const serialize = ({ ...sources } = {}, { site, allSitePage }, { mapping, addUnc
                         node.path = path.resolve(mapping[type].path, node.slug)
                     } else {
                         node.path = node.slug
+                    }
+
+                    if (typeof mapping[type].prefix === `string` && mapping[type].prefix !== ``){
+                        node.path = mapping[type].prefix + node.path
                     }
 
                     // get the real path for the node, which is generated by Gatsby
@@ -257,14 +279,15 @@ exports.onPostBuild = async ({ graphql, pathPrefix }, pluginOptions) => {
 
     // Passing the config option addUncaughtPages will add all pages which are not covered by passed mappings
     // to the default `pages` sitemap. Otherwise they will be ignored.
-    const options = pluginOptions.addUncaughtPages ? _.merge(defaultOptions, pluginOptions) : Object.assign(defaultOptions, pluginOptions)
-    const indexSitemapFile = path.join(PUBLICPATH, pathPrefix, INDEXFILE)
+    const options = pluginOptions.addUncaughtPages ? _.merge(defaultOptions, pluginOptions) : Object.assign({}, defaultOptions, pluginOptions)
+
+    const indexSitemapFile = path.join(PUBLICPATH, pathPrefix, options.output)
     const resourcesSitemapFile = path.join(PUBLICPATH, pathPrefix, RESOURCESFILE)
 
     delete options.plugins
     delete options.createLinkInHead
 
-    options.indexOutput = INDEXFILE
+    options.indexOutput = options.output
     options.resourcesOutput = RESOURCESFILE
 
     // We always query siteAllPage as well as the site query to
@@ -322,7 +345,7 @@ exports.onPostBuild = async ({ graphql, pathPrefix }, pluginOptions) => {
 
     // Save the generated xml files in the public folder
     try {
-        await fs.writeFile(indexSitemapFile, indexSiteMap)
+        await utils.writeFile(indexSitemapFile, indexSiteMap)
     } catch (err) {
         console.error(err)
     }
@@ -332,7 +355,7 @@ exports.onPostBuild = async ({ graphql, pathPrefix }, pluginOptions) => {
 
         // Save the generated xml files in the public folder
         try {
-            await fs.writeFile(filePath, sitemap.xml)
+            await utils.writeFile(filePath, sitemap.xml)
         } catch (err) {
             console.error(err)
         }
